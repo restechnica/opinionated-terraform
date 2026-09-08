@@ -3,10 +3,17 @@ name: main
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Create a release"
+        required: false
+        type: boolean
+        default: false
 
 env:
   GO_VERSION: 1.26
-  NUSHELL_VERSION: 0.91.0
+  NUSHELL_VERSION: 0.103.0
   SBOT_VERSION: "1.7.2"
 
 jobs:
@@ -23,7 +30,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: set up nushell
-        uses: hustcer/setup-nu@v3.8
+        uses: hustcer/setup-nu@v3.27
         with:
           version: ${{ env.NUSHELL_VERSION }}
 
@@ -54,6 +61,7 @@ jobs:
           otf version
 
       - name: release version
+        if: ${{ github.event.inputs.release == 'true' }}
         run: |
           sbot release version --verbose
           sbot push version --verbose

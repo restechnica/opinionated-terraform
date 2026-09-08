@@ -1,0 +1,59 @@
+name: main
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  GO_VERSION: 1.26
+  NUSHELL_VERSION: 0.91.0
+  SBOT_VERSION: "1.7.2"
+
+jobs:
+  build:
+    name: pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up go
+        uses: actions/setup-go@v5
+        with:
+          cache-dependency-path: go.sum
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: set up nushell
+        uses: hustcer/setup-nu@v3.8
+        with:
+          version: ${{ env.NUSHELL_VERSION }}
+
+      - name: set up path
+        run: |
+          mkdir -p bin
+          echo "$(pwd)/bin" >> $GITHUB_PATH
+
+      - name: install semverbot
+        run: |
+          curl -o bin/sbot -L https://github.com/restechnica/semverbot/releases/download/v${SBOT_VERSION}/sbot-linux-amd64
+          chmod +x bin/sbot
+
+      - name: update version
+        run: |
+          sbot update version --verbose
+
+      - name: check
+        run: make check
+
+      - name: test
+        run: make test
+
+      - name: build
+        run: |
+          nu main.nu build --all --version "$(sbot predict version --verbose)"
+          cp bin/otf-linux-amd64 bin/otf
+          otf version
+
+      - name: release version
+        run: |
+          sbot release version --verbose
+          sbot push version --verbose

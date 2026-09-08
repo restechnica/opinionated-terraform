@@ -8,8 +8,8 @@ import (
 
 	"github.com/restechnica/opinionated-terraform/pkg/cli"
 	"github.com/restechnica/opinionated-terraform/pkg/cli/version"
-	"github.com/restechnica/opinionated-terraform/pkg/commander"
 	"github.com/restechnica/opinionated-terraform/pkg/core"
+	"github.com/restechnica/opinionated-terraform/pkg/terraform"
 )
 
 // Execute creates the root command and executes the CLI
@@ -25,7 +25,7 @@ func Execute() error {
 
 // NewCommand creates and returns the root command of the otf CLI.
 func NewCommand() *cobra.Command {
-	cmdr := commander.NewExecCommander()
+	tf := terraform.NewCLI()
 
 	cmd := &cobra.Command{
 		Use:   "otf <env> <command> [terraform args...]",
@@ -35,7 +35,7 @@ switching safe and simple. It automatically re-initializes when the environment
 changes and injects the right -var-file, while passing everything else straight
 through to Terraform.`,
 		PersistentPreRunE:  persistentPreRunE,
-		RunE:               newRunE(cmdr),
+		RunE:               newRunE(tf),
 		Args:               cobra.MinimumNArgs(2),
 		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 	}
@@ -56,7 +56,7 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func newRunE(cmdr commander.Commander) func(cmd *cobra.Command, args []string) error {
+func newRunE(tf terraform.API) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		env := args[0]
 		tfCommand := args[1]
@@ -64,15 +64,7 @@ func newRunE(cmdr commander.Commander) func(cmd *cobra.Command, args []string) e
 
 		log.Debug().Str("env", env).Str("command", tfCommand).Strs("args", tfArgs).Msg("starting...")
 
-		if err := core.ValidateEnv(env); err != nil {
-			return err
-		}
-
-		if err := core.InitIfNeeded(cmdr, env); err != nil {
-			return err
-		}
-
-		if err := core.Run(cmdr, env, tfCommand, tfArgs); err != nil {
+		if err := core.Run(tf, env, tfCommand, tfArgs); err != nil {
 			return err
 		}
 

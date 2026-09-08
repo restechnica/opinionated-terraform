@@ -1,63 +1,37 @@
 package core
 
 import (
-	"errors"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-
 	"github.com/rs/zerolog/log"
 
-	"github.com/restechnica/opinionated-terraform/pkg/cli"
-	"github.com/restechnica/opinionated-terraform/pkg/commander"
+	"github.com/restechnica/opinionated-terraform/pkg/env"
+	"github.com/restechnica/opinionated-terraform/pkg/terraform"
 )
 
-// varFileCommands is the set of terraform commands that accept -var-file.
-var varFileCommands = map[string]bool{
-	"plan":    true,
-	"apply":   true,
-	"destroy": true,
-	"refresh": true,
-	"import":  true,
-	"console": true,
-}
-
-// NeedsVarFile returns true if the terraform command accepts -var-file.
-func NeedsVarFile(command string) bool {
-	return varFileCommands[command]
-}
-
-// BuildArgs constructs the full terraform argument slice, injecting -var-file when appropriate.
-func BuildArgs(env string, command string, extraArgs []string) []string {
-	args := []string{command}
-
-	if NeedsVarFile(command) {
-		varFile := filepath.Join(cli.DefaultVariablesDir, env+".tfvars")
-		args = append(args, "-var-file", varFile)
+// Run validates the environment, initializes if needed, and executes a terraform command.
+func Run(tf terraform.API, target string, command string, extraArgs []string) (err error) {
+	if err = env.Validate(target); err != nil {
+		return err
 	}
 
-	args = append(args, extraArgs...)
+	var current string
 
-	return args
-}
+	if current, err = env.ReadCurrent(); err != nil {
+		return err
+	}
 
-// Run executes a terraform command with the appropriate flags for the given environment.
-// All extra arguments are passed through to terraform verbatim.
-func Run(cmdr commander.Commander, env string, command string, extraArgs []string) error {
-	args := BuildArgs(env, command, extraArgs)
+	if current != target {
+		log.Info().Str("from", current).Str("to", target).Msg("environment changed, running init")
 
-	log.Debug().Strs("args", args).Msg("running terraform")
-
-	if err := cmdr.Stream("terraform", args...); err != nil {
-		var exitErr *exec.ExitError
-
-		if errors.As(err, &exitErr) {
-			os.Exit(exitErr.ExitCode())
+		if err = tf.Init(target); err != nil {
+			return err
 		}
 
-		return fmt.Errorf("running terraform: %w", err)
+		if err = env.WriteCurrent(target); err != nil {
+			return err
+		}
+	} else {
+		log.Debug().Str("env", target).Msg("environment unchanged, skipping init")
 	}
 
-	return nil
+	return tf.Run(target, command, extraArgs)
 }

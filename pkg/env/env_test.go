@@ -1,4 +1,4 @@
-package core
+package env
 
 import (
 	"os"
@@ -11,9 +11,9 @@ import (
 	"github.com/restechnica/opinionated-terraform/pkg/cli"
 )
 
-func TestValidateEnv(t *testing.T) {
-	t.Run("succeeds when both files exist", func(t *testing.T) {
-		dir := t.TempDir()
+func TestValidate(t *testing.T) {
+	t.Run("SucceedWhenBothFilesExist", func(t *testing.T) {
+		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
 		require.NoError(t, os.MkdirAll(cli.DefaultBackendsDir, 0755))
@@ -21,68 +21,78 @@ func TestValidateEnv(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultBackendsDir, "prod.tf"), []byte(""), 0644))
 		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
 
-		err := ValidateEnv("prod")
-		assert.NoError(t, err)
+		var got = Validate("prod")
+
+		assert.NoError(t, got)
 	})
 
-	t.Run("fails when backend config is missing", func(t *testing.T) {
-		dir := t.TempDir()
+	t.Run("FailWhenBackendConfigIsMissing", func(t *testing.T) {
+		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
 		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
 
-		err := ValidateEnv("prod")
-		assert.ErrorContains(t, err, "backend config not found")
+		var got = Validate("prod")
+
+		assert.ErrorContains(t, got, "backend config not found")
 	})
 
-	t.Run("fails when variables file is missing", func(t *testing.T) {
-		dir := t.TempDir()
+	t.Run("FailWhenVariablesFileIsMissing", func(t *testing.T) {
+		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
 		require.NoError(t, os.MkdirAll(cli.DefaultBackendsDir, 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultBackendsDir, "prod.tf"), []byte(""), 0644))
 
-		err := ValidateEnv("prod")
-		assert.ErrorContains(t, err, "variables file not found")
+		var got = Validate("prod")
+
+		assert.ErrorContains(t, got, "variables file not found")
 	})
 }
 
-func TestReadCurrentEnv(t *testing.T) {
-	t.Run("returns empty string when file does not exist", func(t *testing.T) {
-		dir := t.TempDir()
+func TestReadCurrent(t *testing.T) {
+	t.Run("ReturnEmptyStringWhenFileDoesNotExist", func(t *testing.T) {
+		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
-		env, err := ReadCurrentEnv()
+		var got, err = ReadCurrent()
+
 		assert.NoError(t, err)
-		assert.Empty(t, env)
+		assert.Empty(t, got)
 	})
 
-	t.Run("returns env name when file exists", func(t *testing.T) {
-		dir := t.TempDir()
+	t.Run("ReturnEnvNameWhenFileExists", func(t *testing.T) {
+		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
 		require.NoError(t, os.MkdirAll(".terraform", 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(".terraform", cli.DefaultEnvFile), []byte("staging\n"), 0644))
 
-		env, err := ReadCurrentEnv()
+		var want = "staging"
+		var got, err = ReadCurrent()
+
 		assert.NoError(t, err)
-		assert.Equal(t, "staging", env)
+		assert.Equal(t, want, got, `want: '%s', got: '%s'`, want, got)
 	})
 }
 
-func TestWriteCurrentEnv(t *testing.T) {
-	t.Run("writes env to file", func(t *testing.T) {
-		dir := t.TempDir()
+func TestWriteCurrent(t *testing.T) {
+	t.Run("WriteEnvToFile", func(t *testing.T) {
+		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
 		require.NoError(t, os.MkdirAll(".terraform", 0755))
 
-		err := WriteCurrentEnv("prod")
+		var err = WriteCurrent("prod")
 		require.NoError(t, err)
 
+		var want = "prod\n"
 		data, err := os.ReadFile(filepath.Join(".terraform", cli.DefaultEnvFile))
 		require.NoError(t, err)
-		assert.Equal(t, "prod\n", string(data))
+
+		var got = string(data)
+
+		assert.Equal(t, want, got, `want: '%s', got: '%s'`, want, got)
 	})
 }

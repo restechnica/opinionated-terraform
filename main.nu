@@ -8,8 +8,8 @@ def build-all [build_options: list<string>] {
     let architectures = ["amd64", "arm64"]
     let operating_systems = ["windows", "linux", "darwin"]
 
-    $architectures | each { |arch|
-        $operating_systems | each { |os|
+    for arch in $architectures {
+        for os in $operating_systems {
             $env.GOOS = $os
             $env.GOARCH = $arch
 
@@ -19,7 +19,7 @@ def build-all [build_options: list<string>] {
                 $binary_path = $"($binary_path).exe"
             }
 
-            let options =  ["build", "-o",  $binary_path] ++ $build_options
+            let options = ["build", "-o", $binary_path] ++ $build_options
             run-external go ...$options
             print $"built ($binary_path)"
         }
@@ -37,9 +37,7 @@ def build-local [build_options: list<string>] {
 def get-ldflags [version: string] {
     const go_import_path = "github.com/restechnica/opinionated-terraform"
 
-    let ldflags = [
-        $"\"-X ($go_import_path)/internal/ldflags.Version=($version)\""
-    ] | str join ' '
+    let ldflags = $"-X ($go_import_path)/internal/ldflags.Version=($version)"
 
     return $ldflags
 }

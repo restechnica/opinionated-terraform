@@ -6,7 +6,7 @@ on:
 
 env:
   GO_VERSION: 1.26
-  NUSHELL_VERSION: 0.103.0
+  NUSHELL_VERSION: 0.115.0
   SBOT_VERSION: "1.7.2"
 
 jobs:

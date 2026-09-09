@@ -171,7 +171,7 @@ brew install otf
 ### Go
 
 ```bash
-go install github.com/restechnica/opinionated-terraform@latest
+go install github.com/restechnica/opinionated-terraform/cmd/otf@latest
 ```
 
 ### Binary

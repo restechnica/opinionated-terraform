@@ -51,7 +51,8 @@ func TestBuildArgs(t *testing.T) {
 		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
 
-		var got = BuildArgs("prod", "plan", nil)
+		got, err := BuildArgs("prod", "plan", nil)
+		require.NoError(t, err)
 		var want = []string{"plan", "-var-file", "variables/prod.tfvars"}
 
 		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
@@ -63,31 +64,45 @@ func TestBuildArgs(t *testing.T) {
 		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "staging.tfvars"), []byte(""), 0644))
 
-		var got = BuildArgs("staging", "apply", []string{"-target", "module.db", "-auto-approve"})
+		got, err := BuildArgs("staging", "apply", []string{"-target", "module.db", "-auto-approve"})
+		require.NoError(t, err)
 		var want = []string{"apply", "-var-file", "variables/staging.tfvars", "-target", "module.db", "-auto-approve"}
 
 		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
 	})
 
-	t.Run("OmitVarFileForPlanWhenFileIsMissing", func(t *testing.T) {
+	t.Run("OmitVarFileWhenVariablesDirMissing", func(t *testing.T) {
 		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
-		var got = BuildArgs("prod", "plan", nil)
+		got, err := BuildArgs("prod", "plan", nil)
+		require.NoError(t, err)
 		var want = []string{"plan"}
 
 		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
 	})
 
+	t.Run("ErrorWhenVariablesDirExistsButFileIsMissing", func(t *testing.T) {
+		var dir = t.TempDir()
+		require.NoError(t, os.Chdir(dir))
+		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
+
+		_, err := BuildArgs("stagin", "apply", nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "stagin")
+	})
+
 	t.Run("DoNotInjectVarFileForState", func(t *testing.T) {
-		var got = BuildArgs("prod", "state", []string{"list"})
+		got, err := BuildArgs("prod", "state", []string{"list"})
+		require.NoError(t, err)
 		var want = []string{"state", "list"}
 
 		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
 	})
 
 	t.Run("DoNotInjectVarFileForFmt", func(t *testing.T) {
-		var got = BuildArgs("prod", "fmt", nil)
+		got, err := BuildArgs("prod", "fmt", nil)
+		require.NoError(t, err)
 		var want = []string{"fmt"}
 
 		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
@@ -99,7 +114,8 @@ func TestBuildArgs(t *testing.T) {
 		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
 
-		var got = BuildArgs("prod", "destroy", []string{"-auto-approve"})
+		got, err := BuildArgs("prod", "destroy", []string{"-auto-approve"})
+		require.NoError(t, err)
 		var want = []string{"destroy", "-var-file", "variables/prod.tfvars", "-auto-approve"}
 
 		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)

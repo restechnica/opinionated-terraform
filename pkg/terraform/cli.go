@@ -36,16 +36,21 @@ func NewCLI() *CLI {
 }
 
 // Init runs terraform init with the backend config for the given environment.
-// If the backend config file does not exist, init runs without backend configuration.
+// If the backends directory does not exist, init runs without backend configuration.
+// If the backends directory exists but the env-specific file is missing, an error is returned.
 func (api CLI) Init(env string) error {
 	args := []string{"init"}
 
 	backendConfig := filepath.Join(cli.DefaultBackendsDir, env+".tf")
 
-	if fs.Exists(backendConfig) {
+	if fs.Exists(cli.DefaultBackendsDir) {
+		if !fs.Exists(backendConfig) {
+			return fmt.Errorf("backend config %q not found", backendConfig)
+		}
+
 		args = append(args, "-backend-config", backendConfig, "-reconfigure")
 	} else {
-		log.Info().Str("path", backendConfig).Msg("backend config not found, using local state")
+		log.Info().Msg("no backends directory found, using local state")
 	}
 
 	log.Debug().Strs("args", args).Msg("running terraform init")
@@ -56,7 +61,10 @@ func (api CLI) Init(env string) error {
 // Run executes a terraform command with the appropriate flags for the given environment.
 // All extra arguments are passed through to terraform verbatim.
 func (api CLI) Run(env string, command string, extraArgs []string) error {
-	args := BuildArgs(env, command, extraArgs)
+	args, err := BuildArgs(env, command, extraArgs)
+	if err != nil {
+		return err
+	}
 
 	log.Debug().Strs("args", args).Msg("running terraform")
 
@@ -79,21 +87,26 @@ func NeedsVarFile(command string) bool {
 }
 
 // BuildArgs constructs the full terraform argument slice, injecting -var-file when appropriate.
-// If the variables file does not exist on disk, -var-file is omitted.
-func BuildArgs(env string, command string, extraArgs []string) []string {
+// If the variables directory does not exist, -var-file is omitted.
+// If the variables directory exists but the env-specific file is missing, an error is returned.
+func BuildArgs(env string, command string, extraArgs []string) ([]string, error) {
 	args := []string{command}
 
 	if NeedsVarFile(command) {
 		varFile := filepath.Join(cli.DefaultVariablesDir, env+".tfvars")
 
-		if fs.Exists(varFile) {
+		if fs.Exists(cli.DefaultVariablesDir) {
+			if !fs.Exists(varFile) {
+				return nil, fmt.Errorf("variables file %q not found", varFile)
+			}
+
 			args = append(args, "-var-file", varFile)
 		} else {
-			log.Info().Str("path", varFile).Msg("variables file not found, skipping var-file injection")
+			log.Info().Msg("no variables directory found, skipping var-file injection")
 		}
 	}
 
 	args = append(args, extraArgs...)
 
-	return args
+	return args, nil
 }

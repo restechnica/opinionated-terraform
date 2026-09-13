@@ -11,6 +11,7 @@ import (
 
 	"github.com/restechnica/opinionated-terraform/pkg/cli"
 	"github.com/restechnica/opinionated-terraform/pkg/commander"
+	"github.com/restechnica/opinionated-terraform/pkg/fs"
 )
 
 // varFileCommands is the set of terraform commands that accept -var-file.
@@ -35,10 +36,17 @@ func NewCLI() *CLI {
 }
 
 // Init runs terraform init with the backend config for the given environment.
+// If the backend config file does not exist, init runs without backend configuration.
 func (api CLI) Init(env string) error {
+	args := []string{"init"}
+
 	backendConfig := filepath.Join(cli.DefaultBackendsDir, env+".tf")
 
-	args := []string{"init", "-backend-config", backendConfig, "-reconfigure"}
+	if fs.Exists(backendConfig) {
+		args = append(args, "-backend-config", backendConfig, "-reconfigure")
+	} else {
+		log.Info().Str("path", backendConfig).Msg("backend config not found, using local state")
+	}
 
 	log.Debug().Strs("args", args).Msg("running terraform init")
 
@@ -71,12 +79,18 @@ func NeedsVarFile(command string) bool {
 }
 
 // BuildArgs constructs the full terraform argument slice, injecting -var-file when appropriate.
+// If the variables file does not exist on disk, -var-file is omitted.
 func BuildArgs(env string, command string, extraArgs []string) []string {
 	args := []string{command}
 
 	if NeedsVarFile(command) {
 		varFile := filepath.Join(cli.DefaultVariablesDir, env+".tfvars")
-		args = append(args, "-var-file", varFile)
+
+		if fs.Exists(varFile) {
+			args = append(args, "-var-file", varFile)
+		} else {
+			log.Info().Str("path", varFile).Msg("variables file not found, skipping var-file injection")
+		}
 	}
 
 	args = append(args, extraArgs...)

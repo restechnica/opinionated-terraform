@@ -1,9 +1,14 @@
 package terraform
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/restechnica/opinionated-terraform/pkg/cli"
 )
 
 func TestNeedsVarFile(t *testing.T) {
@@ -40,55 +45,63 @@ func TestNeedsVarFile(t *testing.T) {
 }
 
 func TestBuildArgs(t *testing.T) {
-	type Test struct {
-		Name      string
-		Env       string
-		Command   string
-		ExtraArgs []string
-		Want      []string
-	}
+	t.Run("InjectVarFileForPlanWhenFileExists", func(t *testing.T) {
+		var dir = t.TempDir()
+		require.NoError(t, os.Chdir(dir))
+		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
 
-	var tests = []Test{
-		{
-			Name:    "InjectVarFileForPlan",
-			Env:     "prod",
-			Command: "plan",
-			Want:    []string{"plan", "-var-file", "variables/prod.tfvars"},
-		},
-		{
-			Name:      "InjectVarFileForApplyWithExtraArgs",
-			Env:       "staging",
-			Command:   "apply",
-			ExtraArgs: []string{"-target", "module.db", "-auto-approve"},
-			Want:      []string{"apply", "-var-file", "variables/staging.tfvars", "-target", "module.db", "-auto-approve"},
-		},
-		{
-			Name:      "DoNotInjectVarFileForState",
-			Env:       "prod",
-			Command:   "state",
-			ExtraArgs: []string{"list"},
-			Want:      []string{"state", "list"},
-		},
-		{
-			Name:    "DoNotInjectVarFileForFmt",
-			Env:     "prod",
-			Command: "fmt",
-			Want:    []string{"fmt"},
-		},
-		{
-			Name:      "InjectVarFileForDestroyWithExtraArgs",
-			Env:       "prod",
-			Command:   "destroy",
-			ExtraArgs: []string{"-auto-approve"},
-			Want:      []string{"destroy", "-var-file", "variables/prod.tfvars", "-auto-approve"},
-		},
-	}
+		var got = BuildArgs("prod", "plan", nil)
+		var want = []string{"plan", "-var-file", "variables/prod.tfvars"}
 
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			var got = BuildArgs(test.Env, test.Command, test.ExtraArgs)
+		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
+	})
 
-			assert.Equal(t, test.Want, got, `want: '%v', got: '%v'`, test.Want, got)
-		})
-	}
+	t.Run("InjectVarFileForApplyWithExtraArgs", func(t *testing.T) {
+		var dir = t.TempDir()
+		require.NoError(t, os.Chdir(dir))
+		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "staging.tfvars"), []byte(""), 0644))
+
+		var got = BuildArgs("staging", "apply", []string{"-target", "module.db", "-auto-approve"})
+		var want = []string{"apply", "-var-file", "variables/staging.tfvars", "-target", "module.db", "-auto-approve"}
+
+		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
+	})
+
+	t.Run("OmitVarFileForPlanWhenFileIsMissing", func(t *testing.T) {
+		var dir = t.TempDir()
+		require.NoError(t, os.Chdir(dir))
+
+		var got = BuildArgs("prod", "plan", nil)
+		var want = []string{"plan"}
+
+		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
+	})
+
+	t.Run("DoNotInjectVarFileForState", func(t *testing.T) {
+		var got = BuildArgs("prod", "state", []string{"list"})
+		var want = []string{"state", "list"}
+
+		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
+	})
+
+	t.Run("DoNotInjectVarFileForFmt", func(t *testing.T) {
+		var got = BuildArgs("prod", "fmt", nil)
+		var want = []string{"fmt"}
+
+		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
+	})
+
+	t.Run("InjectVarFileForDestroyWithExtraArgs", func(t *testing.T) {
+		var dir = t.TempDir()
+		require.NoError(t, os.Chdir(dir))
+		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
+
+		var got = BuildArgs("prod", "destroy", []string{"-auto-approve"})
+		var want = []string{"destroy", "-var-file", "variables/prod.tfvars", "-auto-approve"}
+
+		assert.Equal(t, want, got, `want: '%v', got: '%v'`, want, got)
+	})
 }

@@ -96,15 +96,19 @@ your-terraform-project/
   main.tf
   variables.tf
   outputs.tf
-  backends/
+  backends/          # optional - omit to use local state
     dev.tf
     staging.tf
     prod.tf
-  variables/
+  variables/         # optional - omit if no env-specific vars needed
     dev.tfvars
     staging.tfvars
     prod.tfvars
 ```
+
+Both directories are optional. If `backends/<env>.tf` is missing, `otf` runs `terraform init` without
+`-backend-config` (local state). If `variables/<env>.tfvars` is missing, `otf` skips `-var-file` injection.
+This makes `otf` usable for projects that use local state or don't need per-environment variables.
 
 Each backend file contains partial backend configuration (bucket, key, region, etc.):
 
@@ -190,10 +194,9 @@ sudo mv otf /usr/local/bin/
 
 When you run `otf prod plan`, here is what happens:
 
-1. **Validates** that `backends/prod.tf` and `variables/prod.tfvars` exist
-2. **Checks** if the environment changed since the last run (tracked in `.terraform/.otf`)
-3. **Runs `terraform init`** with `-backend-config ./backends/prod.tf -reconfigure` if the environment changed
-4. **Runs `terraform plan`** with `-var-file ./variables/prod.tfvars` prepended to your arguments
+1. **Checks** if the environment changed since the last run (tracked in `.terraform/.otf`)
+2. **Runs `terraform init`** if the environment changed - with `-backend-config ./backends/prod.tf -reconfigure` when the backend file exists, or plain `init` for local state
+3. **Runs `terraform plan`** with `-var-file ./variables/prod.tfvars` prepended to your arguments (if the variables file exists)
 
 For commands that don't accept `-var-file` (like `state`, `output`, `fmt`, `validate`), step 4 skips the injection and passes your arguments through directly.
 

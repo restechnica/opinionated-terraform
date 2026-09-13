@@ -7,12 +7,8 @@ import (
 	"github.com/restechnica/opinionated-terraform/pkg/terraform"
 )
 
-// Run validates the environment, initializes if needed, and executes a terraform command.
+// Run initializes if needed and executes a terraform command for the given environment.
 func Run(tf terraform.API, target string, command string, extraArgs []string) (err error) {
-	if err = env.Validate(target); err != nil {
-		return err
-	}
-
 	var current string
 
 	if current, err = env.ReadCurrent(); err != nil {

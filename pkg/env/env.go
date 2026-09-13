@@ -9,20 +9,14 @@ import (
 	"github.com/restechnica/opinionated-terraform/pkg/cli"
 )
 
-// Validate checks that the backend config and variable files exist for the given environment.
-func Validate(env string) error {
-	backendFile := filepath.Join(cli.DefaultBackendsDir, env+".tf")
-	variablesFile := filepath.Join(cli.DefaultVariablesDir, env+".tfvars")
+// GetBackendFilePath returns the backend config file path for the given environment.
+func GetBackendFilePath(env string) string {
+	return filepath.Join(cli.DefaultBackendsDir, env+".tf")
+}
 
-	if _, err := os.Stat(backendFile); os.IsNotExist(err) {
-		return fmt.Errorf("backend config not found: %s", backendFile)
-	}
-
-	if _, err := os.Stat(variablesFile); os.IsNotExist(err) {
-		return fmt.Errorf("variables file not found: %s", variablesFile)
-	}
-
-	return nil
+// GetVariablesFilePath returns the variables file path for the given environment.
+func GetVariablesFilePath(env string) string {
+	return filepath.Join(cli.DefaultVariablesDir, env+".tfvars")
 }
 
 // ReadCurrent reads the current environment from the .terraform/.otf tracking file.

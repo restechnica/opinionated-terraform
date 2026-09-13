@@ -11,44 +11,18 @@ import (
 	"github.com/restechnica/opinionated-terraform/pkg/cli"
 )
 
-func TestValidate(t *testing.T) {
-	t.Run("SucceedWhenBothFilesExist", func(t *testing.T) {
-		var dir = t.TempDir()
-		require.NoError(t, os.Chdir(dir))
+func TestGetBackendFilePath(t *testing.T) {
+	var got = GetBackendFilePath("prod")
+	var want = filepath.Join(cli.DefaultBackendsDir, "prod.tf")
 
-		require.NoError(t, os.MkdirAll(cli.DefaultBackendsDir, 0755))
-		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultBackendsDir, "prod.tf"), []byte(""), 0644))
-		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
+	assert.Equal(t, want, got)
+}
 
-		var got = Validate("prod")
+func TestGetVariablesFilePath(t *testing.T) {
+	var got = GetVariablesFilePath("prod")
+	var want = filepath.Join(cli.DefaultVariablesDir, "prod.tfvars")
 
-		assert.NoError(t, got)
-	})
-
-	t.Run("FailWhenBackendConfigIsMissing", func(t *testing.T) {
-		var dir = t.TempDir()
-		require.NoError(t, os.Chdir(dir))
-
-		require.NoError(t, os.MkdirAll(cli.DefaultVariablesDir, 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultVariablesDir, "prod.tfvars"), []byte(""), 0644))
-
-		var got = Validate("prod")
-
-		assert.ErrorContains(t, got, "backend config not found")
-	})
-
-	t.Run("FailWhenVariablesFileIsMissing", func(t *testing.T) {
-		var dir = t.TempDir()
-		require.NoError(t, os.Chdir(dir))
-
-		require.NoError(t, os.MkdirAll(cli.DefaultBackendsDir, 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(cli.DefaultBackendsDir, "prod.tf"), []byte(""), 0644))
-
-		var got = Validate("prod")
-
-		assert.ErrorContains(t, got, "variables file not found")
-	})
+	assert.Equal(t, want, got)
 }
 
 func TestReadCurrent(t *testing.T) {

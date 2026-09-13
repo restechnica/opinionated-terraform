@@ -11,7 +11,7 @@ prefix = "v"
 
 [semver]
 patch = ["fix", "bug", "chore", "cicd"]
-minor = ["feature"]
+minor = ["feature", "feat"]
 major = ["release"]
 
 [modes]

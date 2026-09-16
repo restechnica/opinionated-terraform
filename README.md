@@ -194,8 +194,8 @@ sudo mv otf /usr/local/bin/
 
 When you run `otf prod plan`, here is what happens:
 
-1. **Checks** if the environment changed since the last run (tracked in `.terraform/.otf`)
-2. **Runs `terraform init`** if the environment changed - with `-backend-config ./backends/prod.tf -reconfigure` when the backend file exists, or plain `init` for local state
+1. **Checks** if the environment or backend config changed since the last run (tracked in `.terraform/.otf` along with a SHA-256 hash of the backend config file)
+2. **Runs `terraform init`** if the environment or backend config changed - with `-backend-config ./backends/prod.tf -reconfigure` when the backend file exists, or plain `init` for local state
 3. **Runs `terraform plan`** with `-var-file ./variables/prod.tfvars` prepended to your arguments (if the variables file exists)
 
 For commands that don't accept `-var-file` (like `state`, `output`, `fmt`, `validate`), step 4 skips the injection and passes your arguments through directly.

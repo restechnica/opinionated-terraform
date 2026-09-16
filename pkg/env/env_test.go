@@ -26,47 +26,59 @@ func TestGetVariablesFilePath(t *testing.T) {
 }
 
 func TestReadCurrent(t *testing.T) {
-	t.Run("ReturnEmptyStringWhenFileDoesNotExist", func(t *testing.T) {
+	t.Run("ReturnEmptyStringsWhenFileDoesNotExist", func(t *testing.T) {
 		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
-		var got, err = ReadCurrent()
+		env, hash, err := ReadCurrent()
 
 		assert.NoError(t, err)
-		assert.Empty(t, got)
+		assert.Empty(t, env)
+		assert.Empty(t, hash)
 	})
 
-	t.Run("ReturnEnvNameWhenFileExists", func(t *testing.T) {
+	t.Run("ReturnEnvAndHashWhenFileExists", func(t *testing.T) {
 		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
 		require.NoError(t, os.MkdirAll(".terraform", 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(".terraform", cli.DefaultEnvFile), []byte("staging\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(".terraform", cli.DefaultEnvFile), []byte("staging\nabc123\n"), 0644))
 
-		var want = "staging"
-		var got, err = ReadCurrent()
+		env, hash, err := ReadCurrent()
 
 		assert.NoError(t, err)
-		assert.Equal(t, want, got, `want: '%s', got: '%s'`, want, got)
+		assert.Equal(t, "staging", env)
+		assert.Equal(t, "abc123", hash)
+	})
+
+	t.Run("ReturnEmptyHashForOldFormat", func(t *testing.T) {
+		var dir = t.TempDir()
+		require.NoError(t, os.Chdir(dir))
+
+		require.NoError(t, os.MkdirAll(".terraform", 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(".terraform", cli.DefaultEnvFile), []byte("prod\n"), 0644))
+
+		env, hash, err := ReadCurrent()
+
+		assert.NoError(t, err)
+		assert.Equal(t, "prod", env)
+		assert.Empty(t, hash)
 	})
 }
 
 func TestWriteCurrent(t *testing.T) {
-	t.Run("WriteEnvToFile", func(t *testing.T) {
+	t.Run("WriteEnvAndHashToFile", func(t *testing.T) {
 		var dir = t.TempDir()
 		require.NoError(t, os.Chdir(dir))
 
 		require.NoError(t, os.MkdirAll(".terraform", 0755))
 
-		var err = WriteCurrent("prod")
+		err := WriteCurrent("prod", "abc123")
 		require.NoError(t, err)
 
-		var want = "prod\n"
 		data, err := os.ReadFile(filepath.Join(".terraform", cli.DefaultEnvFile))
 		require.NoError(t, err)
 
-		var got = string(data)
-
-		assert.Equal(t, want, got, `want: '%s', got: '%s'`, want, got)
+		assert.Equal(t, "prod\nabc123\n", string(data))
 	})
 }

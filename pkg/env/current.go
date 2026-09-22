@@ -9,16 +9,6 @@ import (
 	"github.com/restechnica/opinionated-terraform/pkg/cli"
 )
 
-// GetBackendFilePath returns the backend config file path for the given environment.
-func GetBackendFilePath(env string) string {
-	return filepath.Join(cli.DefaultBackendsDir, env+".tf")
-}
-
-// GetVariablesFilePath returns the variables file path for the given environment.
-func GetVariablesFilePath(env string) string {
-	return filepath.Join(cli.DefaultVariablesDir, env+".tfvars")
-}
-
 // ReadCurrent reads the current environment and backend config hash from the tracking file.
 // Returns empty strings if the file does not exist or uses the old single-line format.
 func ReadCurrent() (env string, backendHash string, err error) {

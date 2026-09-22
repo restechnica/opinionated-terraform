@@ -190,6 +190,38 @@ sudo mv otf /usr/local/bin/
 ```
 
 
+## Shell completion
+
+`otf` supports tab completion for environments and Terraform commands. Available environments are detected from filenames in the `backends/` directory.
+
+### Zsh
+
+```bash
+# Add to your ~/.zshrc
+source <(otf completion zsh)
+```
+
+### Bash
+
+```bash
+# Add to your ~/.bashrc
+source <(otf completion bash)
+```
+
+### Fish
+
+```fish
+# Add to your ~/.config/fish/config.fish
+otf completion fish | source
+```
+
+After reloading your shell, tab completion will suggest environment names and Terraform commands:
+
+```bash
+otf <TAB>          # suggests: dev, staging, prod, ...
+otf prod <TAB>     # suggests: plan, apply, destroy, ...
+```
+
 ## How it works
 
 When you run `otf prod plan`, here is what happens:

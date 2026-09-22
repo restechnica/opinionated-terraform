@@ -59,19 +59,15 @@ func (api CLI) Init(env string) error {
 }
 
 // Run executes a terraform command with the appropriate flags for the given environment.
-// All extra arguments are passed through to terraform verbatim.
-func (api CLI) Run(env string, command string, extraArgs []string) error {
-	args, err := BuildArgs(env, command, extraArgs)
-	if err != nil {
+func (api CLI) Run(env string, command string, args []string) (err error) {
+	if args, err = BuildArgs(env, command, args); err != nil {
 		return err
 	}
 
 	log.Debug().Strs("args", args).Msg("running terraform")
 
-	if err := api.Commander.Stream("terraform", args...); err != nil {
-		var exitErr *exec.ExitError
-
-		if errors.As(err, &exitErr) {
+	if err = api.Commander.Stream("terraform", args...); err != nil {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			os.Exit(exitErr.ExitCode())
 		}
 
@@ -89,8 +85,8 @@ func NeedsVarFile(command string) bool {
 // BuildArgs constructs the full terraform argument slice, injecting -var-file when appropriate.
 // If the variables directory does not exist, -var-file is omitted.
 // If the variables directory exists but the env-specific file is missing, an error is returned.
-func BuildArgs(env string, command string, extraArgs []string) ([]string, error) {
-	args := []string{command}
+func BuildArgs(env string, command string, args []string) ([]string, error) {
+	result := []string{command}
 
 	if NeedsVarFile(command) {
 		varFile := filepath.Join(cli.DefaultVariablesDir, env+".tfvars")
@@ -100,13 +96,13 @@ func BuildArgs(env string, command string, extraArgs []string) ([]string, error)
 				return nil, fmt.Errorf("variables file %q not found", varFile)
 			}
 
-			args = append(args, "-var-file", varFile)
+			result = append(result, "-var-file", varFile)
 		} else {
 			log.Info().Msg("no variables directory found, skipping var-file injection")
 		}
 	}
 
-	args = append(args, extraArgs...)
+	result = append(result, args...)
 
-	return args, nil
+	return result, nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/restechnica/opinionated-terraform/pkg/cli"
 	"github.com/restechnica/opinionated-terraform/pkg/cli/version"
 	"github.com/restechnica/opinionated-terraform/pkg/core"
+	"github.com/restechnica/opinionated-terraform/pkg/env"
 	"github.com/restechnica/opinionated-terraform/pkg/terraform"
 )
 
@@ -26,7 +27,10 @@ var otfFlags = map[string]bool{
 func Execute() error {
 	var command = NewCommand()
 
-	subcommands := make(map[string]bool)
+	subcommands := map[string]bool{
+		"__complete":       true,
+		"__completeNoDesc": true,
+	}
 	for _, sub := range command.Commands() {
 		subcommands[sub.Name()] = true
 		for _, alias := range sub.Aliases {
@@ -95,6 +99,7 @@ through to Terraform.`,
 		PersistentPreRunE: persistentPreRunE,
 		RunE:              newRunE(tf),
 		Args:              cobra.MinimumNArgs(2),
+		ValidArgsFunction: completeArgs,
 	}
 
 	cmd.PersistentFlags().BoolVarP(&cli.VerboseFlag, cli.VerboseFlagName, "v", false,
@@ -111,6 +116,24 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 	cli.ConfigureLogging()
 	return nil
+}
+
+var terraformCommands = []string{
+	"apply", "console", "destroy", "fmt", "force-unlock",
+	"graph", "import", "init", "output", "plan",
+	"providers", "refresh", "show", "state", "taint",
+	"test", "untaint", "validate", "workspace",
+}
+
+func completeArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	switch len(args) {
+	case 0:
+		return env.List(), cobra.ShellCompDirectiveNoFileComp
+	case 1:
+		return terraformCommands, cobra.ShellCompDirectiveNoFileComp
+	default:
+		return nil, cobra.ShellCompDirectiveDefault
+	}
 }
 
 func newRunE(tf terraform.API) func(cmd *cobra.Command, args []string) error {

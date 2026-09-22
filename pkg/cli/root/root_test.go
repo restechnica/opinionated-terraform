@@ -7,7 +7,7 @@ import (
 )
 
 func TestSplitArgs(t *testing.T) {
-	subcommands := map[string]bool{"version": true, "help": true}
+	subcommands := map[string]bool{"version": true, "help": true, "__complete": true, "__completeNoDesc": true}
 
 	tests := []struct {
 		name        string
@@ -98,6 +98,12 @@ func TestSplitArgs(t *testing.T) {
 			args:        []string{"prod", "plan", "-var", "foo=bar"},
 			wantOtfArgs: []string{"prod", "plan"},
 			wantTfArgs:  []string{"-var", "foo=bar"},
+		},
+		{
+			name:        "__complete routes entirely to cobra",
+			args:        []string{"__complete", "prod", ""},
+			wantOtfArgs: []string{"__complete", "prod", ""},
+			wantTfArgs:  nil,
 		},
 	}
 

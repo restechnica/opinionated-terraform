@@ -10,37 +10,37 @@ import (
 	"github.com/restechnica/opinionated-terraform/pkg/cli/version"
 	"github.com/restechnica/opinionated-terraform/pkg/core"
 	"github.com/restechnica/opinionated-terraform/pkg/env"
-	"github.com/restechnica/opinionated-terraform/pkg/terraform"
 )
 
-// terraformExtraArgs holds the raw terraform arguments extracted before cobra parses.
-var terraformExtraArgs []string
+var tfArgs []string
 
-// otfFlags is the set of flags that belong to otf and should be parsed by cobra.
+var tfCommands = []string{
+	"apply", "console", "destroy", "fmt", "force-unlock",
+	"graph", "import", "init", "output", "plan",
+	"providers", "refresh", "show", "state", "taint",
+	"test", "untaint", "validate", "workspace",
+}
+
 var otfFlags = map[string]bool{
 	"--debug": true, "-d": true,
 	"--verbose": true, "-v": true,
 	"--help": true, "-h": true,
 }
 
+// ArgSplitter separates otf arguments from terraform passthrough arguments.
+type ArgSplitter struct {
+	OTFArgs []string
+	TFArgs  []string
+}
+
 // Execute creates the root command and executes the CLI.
 func Execute() error {
 	var command = NewCommand()
 
-	subcommands := map[string]bool{
-		"__complete":       true,
-		"__completeNoDesc": true,
-	}
-	for _, sub := range command.Commands() {
-		subcommands[sub.Name()] = true
-		for _, alias := range sub.Aliases {
-			subcommands[alias] = true
-		}
-	}
-
-	otfArgs, tfArgs := splitArgs(os.Args[1:], subcommands)
-	terraformExtraArgs = tfArgs
-	command.SetArgs(otfArgs)
+	subcommands := GetSubcommandMap(command)
+	splitter := NewArgSplitter(subcommands)
+	tfArgs = splitter.TFArgs
+	command.SetArgs(splitter.OTFArgs)
 
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
@@ -49,46 +49,8 @@ func Execute() error {
 	return nil
 }
 
-// splitArgs separates otf arguments from terraform passthrough arguments.
-// OTF flags and the two positional args (env, command) go to cobra.
-// Everything after the command position is passed to terraform verbatim.
-// If the first positional arg is a known subcommand, all remaining args go to cobra.
-func splitArgs(args []string, subcommands map[string]bool) (otfArgs []string, tfArgs []string) {
-	i := 0
-
-	for i < len(args) {
-		if otfFlags[args[i]] {
-			otfArgs = append(otfArgs, args[i])
-			i++
-			continue
-		}
-		break
-	}
-
-	if i >= len(args) {
-		return otfArgs, nil
-	}
-
-	if subcommands[args[i]] {
-		return append(otfArgs, args[i:]...), nil
-	}
-
-	remaining := args[i:]
-
-	if len(remaining) >= 2 {
-		otfArgs = append(otfArgs, remaining[0], remaining[1])
-		tfArgs = remaining[2:]
-	} else {
-		otfArgs = append(otfArgs, remaining...)
-	}
-
-	return otfArgs, tfArgs
-}
-
 // NewCommand creates and returns the root command of the otf CLI.
 func NewCommand() *cobra.Command {
-	tf := terraform.NewCLI()
-
 	cmd := &cobra.Command{
 		Use:   "otf [flags] <env> <command> [terraform args...]",
 		Short: "A lightweight opinionated wrapper around Terraform",
@@ -97,7 +59,7 @@ switching safe and simple. It automatically re-initializes when the environment
 changes and injects the right -var-file, while passing everything else straight
 through to Terraform.`,
 		PersistentPreRunE: persistentPreRunE,
-		RunE:              newRunE(tf),
+		RunE:              runE,
 		Args:              cobra.MinimumNArgs(2),
 		ValidArgsFunction: completeArgs,
 	}
@@ -112,17 +74,80 @@ through to Terraform.`,
 	return cmd
 }
 
+// GetSubcommandMap returns a set of all registered subcommand names and aliases for the given command,
+// including cobra's internal completion commands.
+func GetSubcommandMap(cmd *cobra.Command) map[string]bool {
+	subcommands := map[string]bool{
+		"__complete":       true,
+		"__completeNoDesc": true,
+	}
+
+	for _, sub := range cmd.Commands() {
+		subcommands[sub.Name()] = true
+		for _, alias := range sub.Aliases {
+			subcommands[alias] = true
+		}
+	}
+
+	return subcommands
+}
+
+// NewArgSplitter splits os.Args using the given subcommand set.
+// OTF flags and the two positional args (env, command) go to OTFArgs.
+// Everything after the command position goes to TFArgs.
+// If the first positional arg is a known subcommand, all remaining args go to OTFArgs.
+func NewArgSplitter(subcommands map[string]bool) ArgSplitter {
+	args := os.Args[1:]
+	i := 0
+
+	var otfArgs []string
+
+	for i < len(args) {
+		if otfFlags[args[i]] {
+			otfArgs = append(otfArgs, args[i])
+			i++
+			continue
+		}
+		break
+	}
+
+	if i >= len(args) {
+		return ArgSplitter{OTFArgs: otfArgs}
+	}
+
+	if subcommands[args[i]] {
+		return ArgSplitter{OTFArgs: append(otfArgs, args[i:]...)}
+	}
+
+	remaining := args[i:]
+
+	if len(remaining) >= 2 {
+		otfArgs = append(otfArgs, remaining[0], remaining[1])
+		return ArgSplitter{OTFArgs: otfArgs, TFArgs: remaining[2:]}
+	}
+
+	return ArgSplitter{OTFArgs: append(otfArgs, remaining...)}
+}
+
 func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 	cli.ConfigureLogging()
 	return nil
 }
 
-var terraformCommands = []string{
-	"apply", "console", "destroy", "fmt", "force-unlock",
-	"graph", "import", "init", "output", "plan",
-	"providers", "refresh", "show", "state", "taint",
-	"test", "untaint", "validate", "workspace",
+func runE(cmd *cobra.Command, args []string) error {
+	targetEnv := args[0]
+	tfCommand := args[1]
+
+	log.Debug().Str("env", targetEnv).Str("command", tfCommand).Strs("args", tfArgs).Msg("starting...")
+
+	if err := core.Run(targetEnv, tfCommand, tfArgs); err != nil {
+		return err
+	}
+
+	log.Debug().Str("env", targetEnv).Str("command", tfCommand).Msg("done")
+
+	return nil
 }
 
 func completeArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -130,26 +155,8 @@ func completeArgs(cmd *cobra.Command, args []string, toComplete string) ([]strin
 	case 0:
 		return env.List(), cobra.ShellCompDirectiveNoFileComp
 	case 1:
-		return terraformCommands, cobra.ShellCompDirectiveNoFileComp
+		return tfCommands, cobra.ShellCompDirectiveNoFileComp
 	default:
 		return nil, cobra.ShellCompDirectiveDefault
-	}
-}
-
-func newRunE(tf terraform.API) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		env := args[0]
-		tfCommand := args[1]
-		tfArgs := terraformExtraArgs
-
-		log.Debug().Str("env", env).Str("command", tfCommand).Strs("args", tfArgs).Msg("starting...")
-
-		if err := core.Run(tf, env, tfCommand, tfArgs); err != nil {
-			return err
-		}
-
-		log.Debug().Str("env", env).Str("command", tfCommand).Msg("done")
-
-		return nil
 	}
 }
